@@ -234,7 +234,7 @@ kbd.k{display:inline-flex;align-items:center;justify-content:center;width:34px;h
   <button id="music-toggle" onclick="toggleFestivalMusicMute()" style="background:rgba(6,9,22,0.6);border:2px solid rgba(200,245,0,0.4);border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;color:#C8F500;display:flex;align-items:center;justify-content:center;padding:0;" title="Toggle music">🔊</button>
   <!-- Visual-only joystick ring/knob — pointer-events:none so canvas receives all touches -->
   <div id="joy-overlay" style="position:fixed;left:0;top:0;width:50%;height:100%;z-index:95;display:block;pointer-events:none;">
-    <div id="joy-ring" style="position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(200,245,0,0.45);background:rgba(6,9,22,0.28);left:15px;bottom:70px;display:none;pointer-events:none;">
+    <div id="joy-ring" style="position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(200,245,0,0.45);background:rgba(6,9,22,0.28);left:15px;bottom:70px;display:block;pointer-events:none;">
       <div id="joy-knob" style="position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(200,245,0,0.75);top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 16px rgba(200,245,0,0.5);pointer-events:none;"></div>
     </div>
   </div>
@@ -674,7 +674,8 @@ let player={name:'',office:null,avatar:null,guitar:null};
 let selectedSong=null,gameState=null,animFrame=null,boardFilter=null,charStep=0,particles=[];
 
 // SCREENS
-function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function showScreen(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');if(_jRing)_jRing.style.display='none';}
+function showJoystick(){if(_jRing)_jRing.style.display='block';}
 
 // CHAR SELECT
 function showChar(){charStep=0;player={name:'',office:null,avatar:null,guitar:null};showScreen('s-char');renderCharStep();}
@@ -1035,7 +1036,7 @@ function acceptRockstar(){
   showHome();
 }
 async function showHome(){showScreen('s-home');const scores=await dbGet(null);if(!scores)return;document.getElementById('home-plays').textContent=scores.length;if(scores.length){document.getElementById('home-best').textContent=(scores[0].score||0).toLocaleString();document.getElementById('home-rank').textContent='#'+(scores.length);}}
-function declineRockstar(){document.getElementById('narrative').classList.remove('active');}
+function declineRockstar(){document.getElementById('narrative').classList.remove('active');showJoystick();}
 function enterMainStage(){
   const ov=document.getElementById('narrative');
   // add close button if not already present
@@ -1063,6 +1064,7 @@ function exitGame(){
   document.onkeydown=null;document.onkeyup=null;
   if(window._gameKeyDown){window.removeEventListener('keydown',window._gameKeyDown);window._gameKeyDown=null;}
   if(window._gameKeyUp){window.removeEventListener('keyup',window._gameKeyUp);window._gameKeyUp=null;}
+  showJoystick();
 }
 async function loadSideLeaderboard(){
   const list=document.getElementById('side-board-list'),label=document.getElementById('side-board-label');
