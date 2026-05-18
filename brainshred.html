@@ -510,7 +510,7 @@ function makeChart(bpm,secs,diff){
   }
   return notes.sort((a,b)=>a.time-b.time);
 }
-const SONGS=SONGS_CONFIG.map(s=>({...s,duration:90000,notes:makeChart(s.bpm,90,s.diff.toLowerCase())}));
+const SONGS=SONGS_CONFIG.map(s=>({...s,duration:35000,notes:makeChart(s.bpm,35,s.diff.toLowerCase())}));
 // ── DIFFICULTY MULTIPLIER ──────────────────────────────────────────────────
 // Accounts for: lanes to cover, note density, BPM, chord rate
 // Expert 100% >> Easy 100% in the rankings, but a great Easy score
