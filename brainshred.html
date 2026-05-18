@@ -233,9 +233,9 @@ kbd.k{display:inline-flex;align-items:center;justify-content:center;width:34px;h
   <div id="minimap-wrap"><canvas id="minimap" width="130" height="130"></canvas><div id="mm-label">Festival Map</div></div>
   <button id="music-toggle" onclick="toggleFestivalMusicMute()" style="background:rgba(6,9,22,0.6);border:2px solid rgba(200,245,0,0.4);border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;color:#C8F500;display:flex;align-items:center;justify-content:center;padding:0;" title="Toggle music">🔊</button>
   <!-- Visual-only joystick ring/knob — pointer-events:none so canvas receives all touches -->
-  <div id="joy-overlay" style="position:fixed;left:0;top:0;width:50%;height:100%;z-index:9999;display:block;pointer-events:none;">
-    <div id="joy-ring" style="position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(200,245,0,0.5);background:rgba(6,9,22,0.4);display:none;transform:translate(-50%,-50%);pointer-events:none;">
-      <div id="joy-knob" style="position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(200,245,0,0.8);top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 16px rgba(200,245,0,0.5);pointer-events:none;"></div>
+  <div id="joy-overlay" style="position:fixed;left:0;top:0;width:50%;height:100%;z-index:95;display:block;pointer-events:none;">
+    <div id="joy-ring" style="position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(200,245,0,0.45);background:rgba(6,9,22,0.28);left:15px;bottom:70px;display:none;pointer-events:none;">
+      <div id="joy-knob" style="position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(200,245,0,0.75);top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 16px rgba(200,245,0,0.5);pointer-events:none;"></div>
     </div>
   </div>
   <!-- Festival leaderboard overlay -->
@@ -2109,7 +2109,7 @@ const shadowDisk=new THREE.Mesh(new THREE.CircleGeometry(0.75,20),new THREE.Mesh
 const glowRing=new THREE.Mesh(new THREE.TorusGeometry(0.85,0.06,6,24),new THREE.MeshBasicMaterial({color:0xC8F500,transparent:true,opacity:0.55})); glowRing.rotation.x=Math.PI/2; glowRing.position.y=0.03; playerGroup.add(glowRing);
 // Player spotlight — follows player, brightens dramatically at night
 const playerSpot=new THREE.SpotLight(0xFFEECC,0,40,Math.PI*.25,.4);
-playerSpot.position.set(playerGroup.position.x,18,playerGroup.position.z);
+playerSpot.position.set(playerGroup.position.x,playerGroup.position.y+18,playerGroup.position.z);
 scene.add(playerSpot);
 playerSpot.target=playerGroup;
 scene.add(playerSpot.target);
@@ -2161,6 +2161,22 @@ function showBoundaryMsg(){
   const el=document.getElementById('boundary-msg');if(el)el.style.display='flex';
   clearTimeout(_boundaryT);_boundaryT=setTimeout(()=>{if(el)el.style.display='none';_boundaryShown=false;},4500);
 }
+// Returns the floor Y for a world-space position, accounting for main stage platform and ramp
+function getFloorY(wx, wz) {
+  // Main stage group sits at world (0, 0, -60); convert to group-local coords
+  const lz = wz + 60;
+  const lx = wx;
+  // Platform top at y=3: local x -32..32, z -15..15
+  if (Math.abs(lx) <= 31 && lz >= -15 && lz <= 15.5) return 3.0;
+  // Ramp approach: center stairs (lx -8..8), left stairs (lx -24.5..-19.5), right (lx 19.5..24.5)
+  const onStair = Math.abs(lx) <= 8 || (lx >= -24.5 && lx <= -19.5) || (lx >= 19.5 && lx <= 24.5);
+  if (onStair && lz >= 11.4 && lz <= 15.6) {
+    const t = (15.6 - lz) / (15.6 - 11.4); // 0 at top of ramp, 1 at platform level
+    return Math.max(0, t * 3.0);
+  }
+  return 0;
+}
+
 function updatePlayer(dt) {
   const fwd=new THREE.Vector3(-Math.sin(sph.theta),0,-Math.cos(sph.theta));
   const rgt=new THREE.Vector3( Math.cos(sph.theta),0,-Math.sin(sph.theta));
@@ -2178,7 +2194,6 @@ function updatePlayer(dt) {
     const nz=playerGroup.position.z+vel.z;
     if(Math.abs(nx)>BOUNDS||nz>BOUNDS||nz<-BOUNDS-5){
       showBoundaryMsg();
-      // Bounce back
       playerGroup.position.x=Math.max(-BOUNDS+2,Math.min(BOUNDS-2,playerGroup.position.x-vel.x*2));
       playerGroup.position.z=Math.max(-BOUNDS-3,Math.min(BOUNDS-2,playerGroup.position.z-vel.z*2));
     } else {
@@ -2190,6 +2205,7 @@ function updatePlayer(dt) {
   } else {
     moveDir.multiplyScalar(0.88);
   }
+  playerGroup.position.y = getFloorY(playerGroup.position.x, playerGroup.position.z);
 }
 
 // Camera
@@ -2232,7 +2248,7 @@ function updateDayNight(dt) {
   venueLights.forEach(pl=>{ pl.intensity=L(0,4.0,t); });
   // Player spotlight: invisible in day, dramatic at night
   playerSpot.intensity=L(0,4.0,t);
-  playerSpot.position.set(playerGroup.position.x,18,playerGroup.position.z);
+  playerSpot.position.set(playerGroup.position.x,playerGroup.position.y+18,playerGroup.position.z);
   // Stage neon: dim in day, INSANE at night
   scene.traverse(child=>{
     if(!child.userData) return;
@@ -2310,11 +2326,14 @@ let t0=null,camId=-1,joyId=-1,joyOx=0,joyOy=0;
 const JOY_MAX=46;
 const _jRing=document.getElementById('joy-ring');
 const _jKnob=document.getElementById('joy-knob');
+// Fixed joystick home: ring left:15px bottom:70px → center at (15+55=70, screen_h-70-55=screen_h-125)
+function _joyHome(){return{x:70,y:window.innerHeight-125};}
+function _joyShowRing(){if(_jRing){const h=_joyHome();joyOx=h.x;joyOy=h.y;_jRing.style.display='block';}}
 function _joyMove(cx,cy){let dx=cx-joyOx,dy=cy-joyOy;const d=Math.sqrt(dx*dx+dy*dy);if(d>JOY_MAX){dx=dx/d*JOY_MAX;dy=dy/d*JOY_MAX;}if(_jKnob)_jKnob.style.transform=`translate(calc(-50% + ${dx}px),calc(-50% + ${dy}px))`;_joyDx=dx/JOY_MAX;_joyDy=dy/JOY_MAX;}
-function _joyReset(){joyId=-1;_joyDx=0;_joyDy=0;if(_jRing)_jRing.style.display='none';if(_jKnob)_jKnob.style.transform='translate(-50%,-50%)';}
+function _joyReset(){joyId=-1;_joyDx=0;_joyDy=0;if(_jKnob)_jKnob.style.transform='translate(-50%,-50%)';}
 renderer.domElement.addEventListener('touchstart',e=>{
   iosUnlockAudio();
-  for(let i=0;i<e.changedTouches.length;i++){const t=e.changedTouches[i];const inGame=document.getElementById('game-layer').classList.contains('active');const inNarr=document.getElementById('narrative').classList.contains('active');if(!inGame&&!inNarr&&joyId===-1&&t.clientX<innerWidth/2){joyId=t.identifier;joyOx=t.clientX;joyOy=t.clientY;if(_jRing){_jRing.style.left=joyOx+'px';_jRing.style.top=joyOy+'px';_jRing.style.display='block';}}else if(camId===-1&&t.clientX>=innerWidth/2){camId=t.identifier;t0={x:t.clientX,y:t.clientY};}}
+  for(let i=0;i<e.changedTouches.length;i++){const t=e.changedTouches[i];const inGame=document.getElementById('game-layer').classList.contains('active');const inNarr=document.getElementById('narrative').classList.contains('active');if(!inGame&&!inNarr&&joyId===-1&&t.clientX<innerWidth/2){joyId=t.identifier;_joyShowRing();}else if(camId===-1&&t.clientX>=innerWidth/2){camId=t.identifier;t0={x:t.clientX,y:t.clientY};}}
   e.preventDefault();
 },{passive:false});
 renderer.domElement.addEventListener('touchmove',e=>{
@@ -2456,7 +2475,7 @@ function animate() {
   if (playerArrowVisible) {
     playerArrow.position.x = playerGroup.position.x;
     playerArrow.position.z = playerGroup.position.z;
-    playerArrow.position.y = 4.5 + Math.sin(t * 2) * 0.3;
+    playerArrow.position.y = playerGroup.position.y + 4.5 + Math.sin(t * 2) * 0.3;
     // Fade out in last 2 seconds (arrow disappears at 8s total)
     const arrowAge = (performance.now() - playerArrowStartTime) / 1000;
     if (arrowAge > 6) playerArrow.material.opacity = Math.max(0, 1 - (arrowAge - 6) / 2);
