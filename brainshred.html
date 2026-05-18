@@ -74,7 +74,7 @@ body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:998;ba
 #zb-desc{font-size:10px;color:rgba(245,240,232,.5);max-width:300px;overflow:hidden;text-overflow:ellipsis;}
 #minimap-wrap{position:fixed;bottom:18px;right:18px;left:auto;z-index:15;pointer-events:none;}
 #music-toggle{position:fixed;top:18px;right:18px;z-index:50;}
-@media (hover:none) and (pointer:coarse){#minimap-wrap{display:none;}#music-toggle{top:auto;bottom:90px;right:16px;}#joy-wrap{display:block !important;}}
+@media (hover:none) and (pointer:coarse){#minimap-wrap{display:none;}#music-toggle{top:auto;bottom:90px;right:16px;}}
 #minimap{display:block;width:130px;height:130px;border-radius:50%;border:1.5px solid rgba(200,245,0,.3);box-shadow:0 4px 20px rgba(0,0,0,.5);}
 #mm-label{text-align:center;margin-top:4px;font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.2em;text-transform:uppercase;color:rgba(245,240,232,.28);}
 #fest-intro-tip{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);z-index:50;background:rgba(6,9,22,.96);border:1px solid rgba(200,245,0,.2);padding:26px 34px 22px;text-align:center;backdrop-filter:blur(22px);box-shadow:0 28px 70px rgba(0,0,0,.6);transition:opacity .7s ease;font-family:'DM Mono',monospace;}
@@ -232,7 +232,12 @@ kbd.k{display:inline-flex;align-items:center;justify-content:center;width:34px;h
   </div>
   <div id="minimap-wrap"><canvas id="minimap" width="130" height="130"></canvas><div id="mm-label">Festival Map</div></div>
   <button id="music-toggle" onclick="toggleFestivalMusicMute()" style="background:rgba(6,9,22,0.6);border:2px solid rgba(200,245,0,0.4);border-radius:50%;width:40px;height:40px;font-size:18px;cursor:pointer;color:#C8F500;display:flex;align-items:center;justify-content:center;padding:0;" title="Toggle music">🔊</button>
-  <div id="joy-wrap" style="position:fixed;bottom:16px;left:16px;z-index:100;display:none;touch-action:none;"><div id="joy-zone" style="width:140px;height:140px;border-radius:50%;background:rgba(6,9,22,0.6);border:2px solid rgba(200,245,0,0.35);position:relative;box-shadow:0 4px 24px rgba(0,0,0,0.5);touch-action:none;user-select:none;-webkit-user-select:none;"><div id="joy-knob" style="position:absolute;width:52px;height:52px;border-radius:50%;background:rgba(200,245,0,0.75);top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 18px rgba(200,245,0,0.4);pointer-events:none;"></div></div></div>
+  <!-- Left-half touch zone for joystick - z-index 9999 so nothing blocks it -->
+  <div id="joy-overlay" style="position:fixed;left:0;top:0;width:50%;height:100%;z-index:9999;display:none;touch-action:none;-webkit-user-select:none;user-select:none;">
+    <div id="joy-ring" style="position:absolute;width:110px;height:110px;border-radius:50%;border:2px solid rgba(200,245,0,0.5);background:rgba(6,9,22,0.4);display:none;transform:translate(-50%,-50%);pointer-events:none;">
+      <div id="joy-knob" style="position:absolute;width:48px;height:48px;border-radius:50%;background:rgba(200,245,0,0.8);top:50%;left:50%;transform:translate(-50%,-50%);box-shadow:0 0 16px rgba(200,245,0,0.5);pointer-events:none;"></div>
+    </div>
+  </div>
   <!-- Festival leaderboard overlay -->
   <div id="fest-board-overlay" style="display:none;position:fixed;inset:0;z-index:80;
     background:rgba(3,5,14,.94);backdrop-filter:blur(12px);
@@ -2443,49 +2448,53 @@ animate();
   }
 })();
 
-// ── Virtual joystick — pointer events + capture for reliable iOS tracking ────
+// ── Virtual joystick — full left-half overlay, z-index 9999 ──────────────────
 (function(){
-  const wrap    = document.getElementById('joy-wrap');
-  const joyZone = document.getElementById('joy-zone');
-  const joyKnob = document.getElementById('joy-knob');
-  const JOY_MAX = 50;
-  let joyPointerId = null, joyOriginX = 0, joyOriginY = 0;
+  const overlay = document.getElementById('joy-overlay');
+  const ring    = document.getElementById('joy-ring');
+  const knob    = document.getElementById('joy-knob');
+  const JOY_MAX = 46;
+  let pid = null, ox = 0, oy = 0;
 
-  // Show on any touch-capable device
-  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
-    wrap.style.display = 'block';
-  }
+  if (!overlay) return;
 
-  function joyReset() {
-    joyPointerId = null;
-    _joyDx = 0; _joyDy = 0;
-    joyKnob.style.transform = 'translate(-50%,-50%)';
-    joyZone.style.background = 'rgba(6,9,22,0.6)';
-  }
+  const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  if (isTouch) overlay.style.display = 'block';
 
-  joyZone.addEventListener('pointerdown', e => {
-    if (document.getElementById('game-layer').classList.contains('active')) return;
-    joyPointerId = e.pointerId;
-    joyOriginX = e.clientX; joyOriginY = e.clientY;
-    joyZone.setPointerCapture(e.pointerId);
-    joyZone.style.background = 'rgba(200,245,0,0.15)';
-    e.preventDefault();
-  }, {passive: false});
-
-  joyZone.addEventListener('pointermove', e => {
-    if (joyPointerId === null || e.pointerId !== joyPointerId) return;
-    if (document.getElementById('game-layer').classList.contains('active')) { joyReset(); return; }
-    let dx = e.clientX - joyOriginX, dy = e.clientY - joyOriginY;
-    const dist = Math.sqrt(dx*dx + dy*dy);
-    if (dist > JOY_MAX) { dx = dx/dist*JOY_MAX; dy = dy/dist*JOY_MAX; }
-    joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  function move(cx, cy) {
+    let dx = cx - ox, dy = cy - oy;
+    const d = Math.sqrt(dx*dx + dy*dy);
+    if (d > JOY_MAX) { dx = dx/d*JOY_MAX; dy = dy/d*JOY_MAX; }
+    knob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
     _joyDx = dx / JOY_MAX;
     _joyDy = dy / JOY_MAX;
+  }
+
+  function reset() {
+    pid = null; _joyDx = 0; _joyDy = 0;
+    ring.style.display = 'none';
+    knob.style.transform = 'translate(-50%,-50%)';
+  }
+
+  overlay.addEventListener('pointerdown', e => {
+    if (document.getElementById('game-layer').classList.contains('active')) return;
+    if (document.getElementById('narrative').classList.contains('active')) return;
+    pid = e.pointerId;
+    ox = e.clientX; oy = e.clientY;
+    ring.style.left = ox + 'px'; ring.style.top = oy + 'px';
+    ring.style.display = 'block';
+    overlay.setPointerCapture(e.pointerId);
     e.preventDefault();
   }, {passive: false});
 
-  joyZone.addEventListener('pointerup',     () => joyReset(), {passive: false});
-  joyZone.addEventListener('pointercancel', () => joyReset(), {passive: false});
+  overlay.addEventListener('pointermove', e => {
+    if (pid === null || e.pointerId !== pid) return;
+    move(e.clientX, e.clientY);
+    e.preventDefault();
+  }, {passive: false});
+
+  overlay.addEventListener('pointerup',     e => { if (e.pointerId===pid) reset(); }, {passive:false});
+  overlay.addEventListener('pointercancel', e => { if (e.pointerId===pid) reset(); }, {passive:false});
 })();
 
 })();
