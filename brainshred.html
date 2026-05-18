@@ -2258,12 +2258,14 @@ function showBoundaryMsg(){
 // Platform: local x -32..32, z -15..15, top at y=3.
 // Ramp: same x range, local z 15..20 (world z -45..-40), linear rise 0→3.
 function getFloorY(wx, wz) {
-  // Stage group at world (0,0,-60). Platform top y=3.0, local z -15..12.
-  // Ramp: local z 12..20, gentler slope so stepLimit=1.2 is never exceeded per frame.
+  // Stage group at world (0,0,-60). Platform top y=3.0.
+  // Platform spans local z -15..15 (world z -75..-45) — covers the FULL footprint including
+  // the stair zone so the avatar can never clip through the front face.
+  // Ramp sits entirely outside the platform (local z 15..20 = world z -45..-40).
   const lz = wz + 60;
   const lx = wx;
-  if (Math.abs(lx) <= 32 && lz >= -15 && lz < 12) return 3.0;
-  if (Math.abs(lx) <= 32 && lz >= 12 && lz <= 20) return Math.max(0, (20 - lz) / 8 * 3.0);
+  if (Math.abs(lx) <= 32 && lz >= -15 && lz <= 15) return 3.0;
+  if (Math.abs(lx) <= 32 && lz > 15 && lz <= 20) return Math.max(0, (20 - lz) / 5 * 3.0);
   return 0;
 }
 
