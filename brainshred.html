@@ -2453,14 +2453,42 @@ function animate() {
 
 animate();
 
-// ── Hint text — swap based on touch ──────────────────────────────────────
+// ── Hint text + intro tip — swap based on touch ──────────────────────────
 (function(){
   const isTouchDev = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   const hintEl = document.getElementById('fest-hint');
   if (hintEl) {
     hintEl.textContent = isTouchDev
-      ? 'Use joystick to explore · Tap stage to shred'
+      ? 'Left thumb: hold & drag to walk  ·  Right thumb: drag to look  ·  Tap stage to shred'
       : 'Arrow keys / WASD to explore · Walk to Main Stage to play';
+  }
+  if (isTouchDev) {
+    const tip = document.getElementById('fest-intro-tip');
+    if (tip) {
+      tip.innerHTML = `
+        <div class="tip-title">BRAINSTOCK '26</div>
+        <div style="margin-bottom:14px;line-height:2;font-size:13px;color:rgba(245,240,232,.75);">
+          <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px;">
+            <span style="font-size:22px;">👈</span>
+            <span><strong style="color:#C8F500;">Left side</strong> — hold &amp; drag to walk</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:6px;">
+            <span style="font-size:22px;">👉</span>
+            <span><strong style="color:#C8F500;">Right side</strong> — drag to look around</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;justify-content:center;">
+            <span style="font-size:22px;">👆</span>
+            <span><strong style="color:#C8F500;">Tap any stage</strong> to play</span>
+          </div>
+        </div>
+        <div class="tip-arrow">▼ TAP ANYWHERE TO START ▼</div>`;
+      tip.style.cursor = 'pointer';
+      tip.addEventListener('touchstart', () => {
+        tip.classList.add('fade');
+        const sa = document.getElementById('stage-alert');
+        if (sa) sa.style.display = 'none';
+      }, {once: true, passive: true});
+    }
   }
 })();
 
