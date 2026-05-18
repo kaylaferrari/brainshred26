@@ -1098,7 +1098,20 @@ function acceptRockstar(){
   showChar();loadSideLeaderboard();
 }
 function declineRockstar(){document.getElementById('narrative').classList.remove('active');}
-function enterMainStage(){document.getElementById('narrative').classList.add('active');initNarrative();}
+function enterMainStage(){
+  const ov=document.getElementById('narrative');
+  // add close button if not already present
+  if(!document.getElementById('narr-close-btn')){
+    const cb=document.createElement('button');
+    cb.id='narr-close-btn';
+    cb.textContent='✕';
+    cb.setAttribute('style','position:absolute;top:12px;right:14px;background:none;border:none;color:rgba(245,240,232,.5);font-size:22px;cursor:pointer;line-height:1;z-index:10;padding:4px 8px;');
+    cb.onclick=declineRockstar;
+    ov.style.position='relative';
+    ov.appendChild(cb);
+  }
+  ov.classList.add('active');initNarrative();
+}
 function exitGame(){
   if(gameState)gameState.running=false;
   cancelAnimationFrame(animFrame);
@@ -2430,64 +2443,49 @@ animate();
   }
 })();
 
-// ── Virtual joystick ─────────────────────────────────────────────────────────
+// ── Virtual joystick — pointer events + capture for reliable iOS tracking ────
 (function(){
-  const wrap   = document.getElementById('joy-wrap');
+  const wrap    = document.getElementById('joy-wrap');
   const joyZone = document.getElementById('joy-zone');
   const joyKnob = document.getElementById('joy-knob');
   const JOY_MAX = 50;
-  let joyActive = false, joyTouchId = null, joyOriginX = 0, joyOriginY = 0;
+  let joyPointerId = null, joyOriginX = 0, joyOriginY = 0;
 
-  // Show on any touch device via JS (more reliable than CSS media query)
+  // Show on any touch-capable device
   if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
     wrap.style.display = 'block';
   }
 
   function joyReset() {
-    joyActive = false; joyTouchId = null;
+    joyPointerId = null;
     _joyDx = 0; _joyDy = 0;
     joyKnob.style.transform = 'translate(-50%,-50%)';
-  }
-  function inJoyZone(x, y) {
-    const r = joyZone.getBoundingClientRect();
-    if (!r.width) return false;
-    const cx = r.left + r.width/2, cy = r.top + r.height/2;
-    return Math.sqrt((x-cx)**2 + (y-cy)**2) <= r.width/2 + 20;
+    joyZone.style.background = 'rgba(6,9,22,0.6)';
   }
 
-  document.addEventListener('touchstart', e => {
+  joyZone.addEventListener('pointerdown', e => {
     if (document.getElementById('game-layer').classList.contains('active')) return;
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      const t = e.changedTouches[i];
-      if (inJoyZone(t.clientX, t.clientY)) {
-        joyActive = true; joyTouchId = t.identifier;
-        joyOriginX = t.clientX; joyOriginY = t.clientY;
-        e.preventDefault(); break;
-      }
-    }
+    joyPointerId = e.pointerId;
+    joyOriginX = e.clientX; joyOriginY = e.clientY;
+    joyZone.setPointerCapture(e.pointerId);
+    joyZone.style.background = 'rgba(200,245,0,0.15)';
+    e.preventDefault();
   }, {passive: false});
 
-  document.addEventListener('touchmove', e => {
-    if (!joyActive) return;
+  joyZone.addEventListener('pointermove', e => {
+    if (joyPointerId === null || e.pointerId !== joyPointerId) return;
     if (document.getElementById('game-layer').classList.contains('active')) { joyReset(); return; }
-    for (let i = 0; i < e.touches.length; i++) {
-      const t = e.touches[i];
-      if (t.identifier !== joyTouchId) continue;
-      let dx = t.clientX - joyOriginX, dy = t.clientY - joyOriginY;
-      const dist = Math.sqrt(dx*dx + dy*dy);
-      if (dist > JOY_MAX) { dx = dx/dist*JOY_MAX; dy = dy/dist*JOY_MAX; }
-      joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-      _joyDx = dx / JOY_MAX;
-      _joyDy = dy / JOY_MAX;
-      e.preventDefault(); break;
-    }
+    let dx = e.clientX - joyOriginX, dy = e.clientY - joyOriginY;
+    const dist = Math.sqrt(dx*dx + dy*dy);
+    if (dist > JOY_MAX) { dx = dx/dist*JOY_MAX; dy = dy/dist*JOY_MAX; }
+    joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+    _joyDx = dx / JOY_MAX;
+    _joyDy = dy / JOY_MAX;
+    e.preventDefault();
   }, {passive: false});
 
-  document.addEventListener('touchend', e => {
-    for (let i = 0; i < e.changedTouches.length; i++) {
-      if (e.changedTouches[i].identifier === joyTouchId) { joyReset(); break; }
-    }
-  }, {passive: false});
+  joyZone.addEventListener('pointerup',     () => joyReset(), {passive: false});
+  joyZone.addEventListener('pointercancel', () => joyReset(), {passive: false});
 })();
 
 })();
