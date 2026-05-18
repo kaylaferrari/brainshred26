@@ -717,8 +717,9 @@ function startFestivalMusic() {
   if (!_festAmbEl) {
     _festAmbEl = new Audio('festival-ambient.mp3');
     _festAmbEl.loop = true;
-    _festAmbEl.volume = _festivalMusicMuted ? 0 : 0.5;
+    _festAmbEl.volume = 0.5;
   }
+  if (_festivalMusicMuted) return;
   if (actx && actx.state === 'suspended') actx.resume();
   _festAmbEl.play().catch(e => console.warn('Festival music:', e));
 }
@@ -730,10 +731,12 @@ function stopFestivalMusic() {
 
 function toggleFestivalMusicMute() {
   _festivalMusicMuted = !_festivalMusicMuted;
-  if (!_festAmbEl) startFestivalMusic();
-  if (_festAmbEl) _festAmbEl.volume = _festivalMusicMuted ? 0 : 0.5;
   const btn = document.getElementById('music-toggle');
   if (btn) btn.textContent = _festivalMusicMuted ? '🔇' : '🔊';
+  if (!_festAmbEl) { if (!_festivalMusicMuted) startFestivalMusic(); return; }
+  // Use pause/play rather than volume — iOS ignores JS volume changes
+  if (_festivalMusicMuted) { _festAmbEl.pause(); }
+  else { _festAmbEl.volume=0.5; _festAmbEl.play().catch(()=>{}); }
 }
 
 function startSynth(bpm){
@@ -2285,19 +2288,10 @@ function updatePlayer(dt) {
       playerGroup.position.x=Math.max(-BOUNDS+2,Math.min(BOUNDS-2,playerGroup.position.x-vel.x*2));
       playerGroup.position.z=Math.max(-BOUNDS-3,Math.min(BOUNDS-2,playerGroup.position.z-vel.z*2));
     } else {
-      const curY=playerGroup.position.y;
-      const stepLimit=1.2;
-      const fullOk=getFloorY(nx,nz)<=curY+stepLimit;
-      const xOk=getFloorY(nx,playerGroup.position.z)<=curY+stepLimit;
-      const zOk=getFloorY(playerGroup.position.x,nz)<=curY+stepLimit;
-      if(fullOk){
-        playerGroup.position.x=nx;
-        playerGroup.position.z=nz;
-      } else if(xOk){
-        playerGroup.position.x=nx;
-      } else if(zOk){
-        playerGroup.position.z=nz;
-      }
+      // No step-height blocking — getFloorY y-snap at end of frame handles all height transitions.
+      // Blocking caused diagonal approaches to be permanently stuck at the ramp boundary.
+      playerGroup.position.x=nx;
+      playerGroup.position.z=nz;
     }
     playerGroup.rotation.y=Math.atan2(vel.x,vel.z);
     moveDir.set(-Math.sin(playerGroup.rotation.y),0,-Math.cos(playerGroup.rotation.y));
