@@ -342,9 +342,26 @@ kbd.k{display:inline-flex;align-items:center;justify-content:center;width:34px;h
     <button class="btn ghost" onclick="exitGame()" style="width:100%;font-size:.85rem;margin-top:4px;letter-spacing:.06em;white-space:nowrap;">← Festival</button>
   </div>
   <div id="game-column">
+    <div id="s-home" class="screen" style="flex-direction:column;align-items:center;justify-content:space-between;background:#060916;padding:0;">
+      <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px 0;text-align:center;">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(68px,20vw,108px);color:#F5F0E8;line-height:.85;letter-spacing:-.01em;">BRAIN<br>SHRED</div>
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(34px,10vw,54px);color:#C8F500;letter-spacing:.05em;margin-top:6px;">'26</div>
+        <div style="font-family:'DM Mono',monospace;font-size:10px;letter-spacing:.22em;color:rgba(245,240,232,.4);text-transform:uppercase;margin-top:18px;">SHRED THE GRID. OWN THE FLOOR.</div>
+        <div style="width:72%;max-width:260px;height:1px;background:rgba(245,240,232,.12);margin:22px auto;"></div>
+        <div style="display:flex;gap:36px;">
+          <div style="text-align:center;"><div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,7vw,36px);color:#C8F500;" id="home-best">—</div><div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.2em;color:rgba(245,240,232,.38);margin-top:2px;">BEST</div></div>
+          <div style="text-align:center;"><div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,7vw,36px);color:#C8F500;" id="home-plays">—</div><div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.2em;color:rgba(245,240,232,.38);margin-top:2px;">PLAYS</div></div>
+          <div style="text-align:center;"><div style="font-family:'Bebas Neue',sans-serif;font-size:clamp(26px,7vw,36px);color:#C8F500;" id="home-rank">—</div><div style="font-family:'DM Mono',monospace;font-size:8px;letter-spacing:.2em;color:rgba(245,240,232,.38);margin-top:2px;">RANK</div></div>
+        </div>
+      </div>
+      <div style="width:100%;padding:0 22px 44px;display:flex;flex-direction:column;gap:11px;max-width:440px;align-self:center;">
+        <button class="btn" onclick="showChar();loadSideLeaderboard();" style="font-size:clamp(16px,4.5vw,22px);padding:17px 0;letter-spacing:.12em;">TAP TO PLAY</button>
+        <button class="btn ghost" onclick="openLeaderboard();" style="font-size:clamp(14px,4vw,19px);padding:14px 0;letter-spacing:.1em;">LEADERBOARD</button>
+      </div>
+    </div>
     <div id="s-char" class="screen">
       <div style="background:#C8F500;padding:7px 14px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
-        <button onclick="exitGame()" style="background:none;border:none;color:#060916;font-size:19px;padding:2px 5px;">←</button>
+        <button onclick="showHome()" style="background:none;border:none;color:#060916;font-size:19px;padding:2px 5px;">←</button>
         <div class="fest" style="font-size:13px;color:#060916;letter-spacing:.2em;" id="char-step-label">STEP 1 OF 4</div>
         <div style="width:28px;"></div>
       </div>
@@ -812,7 +829,7 @@ function buildSongList(){
     <div style="display:flex;gap:20px;">
       <div><div class="mono" style="font-size:7px;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;">BPM</div><div class="fest" style="font-size:20px;">${s.bpm}</div></div>
       <div><div class="mono" style="font-size:7px;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;">Notes</div><div class="fest" style="font-size:20px;">${s.notes.length}</div></div>
-      <div><div class="mono" style="font-size:7px;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;">Length</div><div class="fest" style="font-size:20px;">1:00</div></div>
+      <div><div class="mono" style="font-size:7px;color:var(--muted);letter-spacing:.15em;text-transform:uppercase;">Length</div><div class="fest" style="font-size:20px;">${Math.floor(s.duration/60000)}:${String(Math.floor((s.duration%60000)/1000)).padStart(2,'0')}</div></div>
     </div></div>`).join('')+'<div style="height:20px;"></div>';
 }
 function selectSong(id){
@@ -1100,8 +1117,9 @@ function acceptRockstar(){
   document.getElementById('narrative').classList.remove('active');
   stopFestivalMusic();
   document.getElementById('game-layer').classList.add('active');
-  showChar();loadSideLeaderboard();
+  showHome();
 }
+async function showHome(){showScreen('s-home');const scores=await dbGet(null);if(!scores)return;document.getElementById('home-plays').textContent=scores.length;if(scores.length){document.getElementById('home-best').textContent=(scores[0].score||0).toLocaleString();document.getElementById('home-rank').textContent='#'+(scores.length);}}
 function declineRockstar(){document.getElementById('narrative').classList.remove('active');}
 function enterMainStage(){
   const ov=document.getElementById('narrative');
