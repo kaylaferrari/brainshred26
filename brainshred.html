@@ -1474,8 +1474,6 @@ const FEST_ZONES = [
     desc:'Your home for the weekend. Hot showers, charging stations, 24/7 chill-out lounge.' },
   { id:'growth-bar',   name:'The Growth Lounge',  hex:'#FF6B35', color:0xFF6B35, pos:[0,0,45],    labelY:16, radius:14,
     desc:'Craft cocktails, local ales. Perfect spot to watch the sunset.' },
-  { id:'ferris-wheel', name:'Creative Corner',    hex:'#EC4899', color:0xEC4899, pos:[70,0,15],   labelY:36, radius:13,
-    desc:'Hop on the ferris wheel for a bird\'s eye view of Brainshred \'26!' },
 ];
 const FEST_PATH_DATA = [
   [[0,55],[0,-60]],
@@ -2512,6 +2510,9 @@ function checkProximity() {
   const px=playerGroup.position.x,pz=playerGroup.position.z;
   let hit=null,hitDist=Infinity;
   FEST_ZONES.forEach(z=>{ const d=Math.hypot(px-z.pos[0],pz-z.pos[2]); if(d<z.radius&&d<hitDist){hit=z;hitDist=d;} });
+  // Ferris wheel proximity (not in BUILDERS, handled separately)
+  const ferrisDist=Math.hypot(px-FERRIS_WX,pz-FERRIS_WZ);
+  if(ferrisDist<13&&ferrisDist<hitDist){hit={id:'ferris-wheel',name:'Creative Corner',hex:'#EC4899',desc:'Hop on the ferris wheel for a bird\'s eye view!'};hitDist=ferrisDist;}
   const newId=hit?hit.id:null;
   if(newId===proximityZoneId)return;
   proximityZoneId=newId;
@@ -2539,14 +2540,16 @@ let activeId=null,clickZoneId=null,hMeshes=[];
 function clearHighlight() { hMeshes.forEach(({mesh,origMat})=>{ mesh.material.dispose(); mesh.material=origMat; }); hMeshes=[]; activeId=null; }
 function applyHighlightOnly(zoneId) {
   clearHighlight(); activeId=zoneId;
-  zoneMap.get(zoneId).group.traverse(child=>{ if(!child.isMesh)return; const o=child.material; child.material=o.clone(); child.material.emissive=new THREE.Color(0.38,0.18,0.04); hMeshes.push({mesh:child,origMat:o}); });
+  const entry=zoneMap.get(zoneId); if(!entry)return;
+  entry.group.traverse(child=>{ if(!child.isMesh)return; const o=child.material; child.material=o.clone(); child.material.emissive=new THREE.Color(0.38,0.18,0.04); hMeshes.push({mesh:child,origMat:o}); });
 }
 function focusZone(zoneId,sx,sy) {
   if(zoneId==='main-stage'&&!document.getElementById('narrative').classList.contains('active')&&!document.getElementById('game-layer').classList.contains('active')){
     setTimeout(enterMainStage,100);return;
   }
   if(proximityZoneId)return;
-  const{zone}=zoneMap.get(zoneId);
+  const entry=zoneMap.get(zoneId); if(!entry)return;
+  const{zone}=entry;
   if(clickZoneId===zoneId){ clickZoneId=null; clearHighlight(); popupEl.classList.remove('show'); return; }
   clickZoneId=zoneId; applyHighlightOnly(zoneId);
   pSwatch.style.background=zone.hex; pSwatch.style.boxShadow=`0 0 14px ${zone.hex}99`; pName.textContent=zone.name; pDesc.textContent=zone.desc;
