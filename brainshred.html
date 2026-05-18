@@ -729,16 +729,25 @@ function startSynth(bpm){
 function stopAudio(){if(_fadeInterval){clearInterval(_fadeInterval);_fadeInterval=null;}synthI.forEach(i=>clearInterval(i));synthI=[];if(songEl){try{songEl.pause();songEl.src='';}catch(e){}songEl=null;}}
 let _fadeInterval=null;
 function startAudio(song){
-  stopAudio();
+  // Reuse preloaded element if available (same song), otherwise create fresh
+  const url=getAudioUrl(song.id);
+  if(!songEl||songEl.src!==url){stopAudio();}else{try{songEl.currentTime=0;}catch(e){}}
   if(!actx)actx=new(window.AudioContext||window.webkitAudioContext)();
   const doPlay=()=>{
-  const url=getAudioUrl(song.id);
   if(url){
-    songEl=new Audio(url);
-    songEl.volume=.85;
-    songEl.crossOrigin='anonymous';
+    if(!songEl){songEl=new Audio(url);songEl.volume=.85;songEl.crossOrigin='anonymous';}
+    // ── Sync game clock to actual audio output ───────────────────────────
+    // 'playing' fires when audio truly starts producing output (after decode/buffer)
+    songEl.addEventListener('playing',function onPlaying(){
+      if(gameState)gameState.startTime=performance.now()-songEl.currentTime*1000;
+    },{once:true});
+    // Periodic drift correction: nudge startTime if audio clock diverges >35ms
+    songEl.addEventListener('timeupdate',function(){
+      if(!gameState||!gameState.running||gameState.paused||songEl.paused)return;
+      const drift=songEl.currentTime*1000-(performance.now()-gameState.startTime);
+      if(Math.abs(drift)>35)gameState.startTime-=drift*0.4;
+    });
     songEl.play().catch(e=>{console.warn('Audio failed:',e);startSynth(song.bpm);});
-    // Clear any existing fade interval before starting new one
     if(_fadeInterval){clearInterval(_fadeInterval);_fadeInterval=null;}
     _fadeInterval=setInterval(()=>{
       if(!songEl){clearInterval(_fadeInterval);_fadeInterval=null;return;}
@@ -881,6 +890,9 @@ function startGame(){
   };
   window.addEventListener('keydown',window._gameKeyDown);
   window.addEventListener('keyup',window._gameKeyUp);
+  // Preload audio during the countdown so it's buffered before play() is called
+  const preloadUrl=getAudioUrl(selectedSong.id);
+  if(preloadUrl){songEl=new Audio(preloadUrl);songEl.volume=.85;songEl.crossOrigin='anonymous';songEl.preload='auto';songEl.load();}
   let cd=3;document.getElementById('countdown-overlay').style.display='flex';
   const cpEl=document.getElementById('countdown-player');
   cpEl.innerHTML=`<span class="av-img av-img-${av?.id||'rockstar'}" style="width:28px;height:35px;display:inline-block;vertical-align:middle;margin-right:6px;"></span>${player.name} · ${off?.emoji} ${off?.name}`;
