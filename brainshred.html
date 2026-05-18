@@ -1210,7 +1210,22 @@ document.getElementById('festival-world').prepend(renderer.domElement);
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(54, innerWidth / innerHeight, 0.1, 600);
 const sph = { theta:0.5, phi:0.72, r:90 };
-const camBase   = new THREE.Vector3(0, 2, 50);
+const SPAWN_POINTS = [
+  {x:  0,  z: 10},   // center open ground (original)
+  {x: 30,  z: 20},   // east side open
+  {x:-30,  z: 20},   // west side open
+  {x: 55,  z: 30},   // near food truck row
+  {x:-50,  z: 30},   // west edge
+  {x: 20,  z:-20},   // mid-field east
+  {x:-20,  z:-20},   // mid-field west
+  {x: 60,  z:-30},   // east far
+  {x:-60,  z: 10},   // near DJ booth approach
+  {x:  0,  z: 40},   // south open
+  {x: 40,  z:-40},   // southeast
+  {x:-40,  z:-40},   // southwest
+];
+const _sp = SPAWN_POINTS[Math.floor(Math.random() * SPAWN_POINTS.length)];
+const camBase   = new THREE.Vector3(_sp.x, 2, _sp.z);
 const lookAhead = new THREE.Vector3();
 const moveDir   = new THREE.Vector3();
 
@@ -2030,7 +2045,7 @@ addFluffySculpture(-15,60,10,3.5,0xBF5FFF); addFluffySculpture(25,55,9,3.0,0xC8F
 }
 
 // Player
-const playerGroup=new THREE.Group(); playerGroup.position.set(0,0,55); scene.add(playerGroup);
+const playerGroup=new THREE.Group(); playerGroup.position.set(_sp.x,0,_sp.z); scene.add(playerGroup);
 const bodyMesh=new THREE.Mesh(new THREE.SphereGeometry(0.72,20,20),new THREE.MeshLambertMaterial({color:0xFFEEDD,emissive:new THREE.Color(0.08,0.04,0.01)})); bodyMesh.position.y=0.72; bodyMesh.castShadow=true; playerGroup.add(bodyMesh);
 const headMesh=new THREE.Mesh(new THREE.SphereGeometry(0.50,20,20),new THREE.MeshLambertMaterial({color:0xFFE4C8,emissive:new THREE.Color(0.06,0.03,0)})); headMesh.position.y=1.72; headMesh.castShadow=true; playerGroup.add(headMesh);
 const hatMesh=new THREE.Mesh(new THREE.ConeGeometry(0.42,0.8,10),new THREE.MeshLambertMaterial({color:0xC8F500,emissive:new THREE.Color(0.15,0.2,0)})); hatMesh.position.y=2.52; hatMesh.castShadow=true; playerGroup.add(hatMesh);
