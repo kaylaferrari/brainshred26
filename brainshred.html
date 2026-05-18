@@ -569,10 +569,10 @@ function calcWeightedScore(rawScore, accuracyPct, song){
 let db=null;
 const isConfigured=SUPABASE_URL!=='YOUR_SUPABASE_URL'&&SUPABASE_KEY!=='YOUR_SUPABASE_ANON_KEY';
 if(isConfigured){try{db=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);}catch(e){console.warn(e);}}
-async function dbSave(e){if(!db){lsSave(e);return;}const{error}=await db.from('scores').insert({player_name:e.name,office:e.office,avatar:e.avatar,score:e.score,raw_score:e.rawScore||e.score,accuracy:e.accuracy,grade:e.grade,max_combo:e.combo,song_id:e.songId,song_title:e.songTitle,diff_mult:e.diffMult||1});if(error){lsSave(e);}}
+async function dbSave(e){if(!db){lsSave(e);return;}await db.from('scores').delete().eq('player_name',e.name);const{error}=await db.from('scores').insert({player_name:e.name,office:e.office,avatar:e.avatar,score:e.score,raw_score:e.rawScore||e.score,accuracy:e.accuracy,grade:e.grade,max_combo:e.combo,song_id:e.songId,song_title:e.songTitle,diff_mult:e.diffMult||1});if(error){lsSave(e);}}
 async function dbGet(off){if(!db)return lsGet(off);let q=db.from('scores').select('*').order('score',{ascending:false}).limit(100);if(off)q=q.eq('office',off);const{data,error}=await q;if(error)return lsGet(off);return(data||[]).map(r=>({id:r.id,name:r.player_name,office:r.office,avatar:r.avatar,score:r.score,accuracy:r.accuracy,grade:r.grade,combo:r.max_combo,songId:r.song_id,songTitle:r.song_title,diffMult:r.diff_mult,ts:new Date(r.created_at).getTime()}));}
 const LS='bs26v1';
-function lsSave(e){try{const a=lsGet();a.push(e);localStorage.setItem(LS,JSON.stringify(a.sort((a,b)=>b.score-a.score).slice(0,200)));}catch{}}
+function lsSave(e){try{const a=lsGet().filter(s=>s.name!==e.name);a.push(e);localStorage.setItem(LS,JSON.stringify(a.sort((a,b)=>b.score-a.score).slice(0,200)));}catch{}}
 function lsGet(off){try{let a=JSON.parse(localStorage.getItem(LS)||'[]');return off?a.filter(s=>s.office===off):a;}catch{return[];}}
 
 // AUDIO
