@@ -475,7 +475,7 @@ const OFFICES=[
 const AVATARS=[
   {id:'rockstar',   name:'The Rockstar',      emoji:'🎸',desc:'Classic shredder'},
   {id:'analyst',    name:'The Analyst',       emoji:'📊',desc:'Data beats per minute'},
-  {id:'diva',       name:'The Planner',        emoji:'👩‍🎤',desc:'Mapping the whole journey'},
+  {id:'planner',    name:'The Planner',        emoji:'👩‍🎤',desc:'Mapping the whole journey'},
   {id:'hacker',     name:'The Growth Hacker', emoji:'⚡',desc:'Optimising every riff'},
   {id:'creative',   name:'The Creative',      emoji:'👩‍🎨',desc:'Full-funnel artistry'},
   {id:'programmer', name:'The Programmer',    emoji:'💻',desc:'Shipping beats to production'},
@@ -2097,6 +2097,7 @@ setTimeout(() => {
 
 // Input
 const keys={};
+let _joyDx=0,_joyDy=0; // joystick analog values, -1..1
 const CAPTURED=new Set(['arrowup','arrowdown','arrowleft','arrowright']); // only prevent scroll keys
 const introEl=document.getElementById('fest-intro-tip');
 window.addEventListener('keydown', e => {
@@ -2132,6 +2133,8 @@ function updatePlayer(dt) {
   if (keys['j']||keys['arrowdown'])  vel.addScaledVector(fwd,-1);
   if (keys['d']||keys['arrowleft'])  vel.addScaledVector(rgt,-1);
   if (keys['k']||keys['arrowright']) vel.addScaledVector(rgt, 1);
+  if (Math.abs(_joyDy)>0.1) vel.addScaledVector(fwd, -_joyDy);
+  if (Math.abs(_joyDx)>0.1) vel.addScaledVector(rgt,  _joyDx);
   isMoving = vel.lengthSq() > 0;
   if (isMoving) {
     vel.normalize().multiplyScalar(SPEED * dt);
@@ -2427,27 +2430,29 @@ animate();
   }
 })();
 
-// ── Virtual joystick — document-level so canvas z-index can't block it ──────
+// ── Virtual joystick ─────────────────────────────────────────────────────────
 (function(){
+  const wrap   = document.getElementById('joy-wrap');
   const joyZone = document.getElementById('joy-zone');
   const joyKnob = document.getElementById('joy-knob');
-  const JOY_MAX = 38, JOY_KEYS = ['arrowup','arrowdown','arrowleft','arrowright'];
+  const JOY_MAX = 50;
   let joyActive = false, joyTouchId = null, joyOriginX = 0, joyOriginY = 0;
 
-  function joySetKeys(dx, dy) {
-    const thr = JOY_MAX * 0.22;
-    keys['arrowup'] = dy < -thr; keys['arrowdown'] = dy > thr;
-    keys['arrowleft'] = dx < -thr; keys['arrowright'] = dx > thr;
+  // Show on any touch device via JS (more reliable than CSS media query)
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    wrap.style.display = 'block';
   }
+
   function joyReset() {
     joyActive = false; joyTouchId = null;
+    _joyDx = 0; _joyDy = 0;
     joyKnob.style.transform = 'translate(-50%,-50%)';
-    JOY_KEYS.forEach(k => keys[k] = false);
   }
   function inJoyZone(x, y) {
     const r = joyZone.getBoundingClientRect();
+    if (!r.width) return false;
     const cx = r.left + r.width/2, cy = r.top + r.height/2;
-    return Math.sqrt((x-cx)**2 + (y-cy)**2) <= r.width/2 + 10;
+    return Math.sqrt((x-cx)**2 + (y-cy)**2) <= r.width/2 + 20;
   }
 
   document.addEventListener('touchstart', e => {
@@ -2456,8 +2461,7 @@ animate();
       const t = e.changedTouches[i];
       if (inJoyZone(t.clientX, t.clientY)) {
         joyActive = true; joyTouchId = t.identifier;
-        const r = joyZone.getBoundingClientRect();
-        joyOriginX = r.left + r.width/2; joyOriginY = r.top + r.height/2;
+        joyOriginX = t.clientX; joyOriginY = t.clientY;
         e.preventDefault(); break;
       }
     }
@@ -2473,7 +2477,9 @@ animate();
       const dist = Math.sqrt(dx*dx + dy*dy);
       if (dist > JOY_MAX) { dx = dx/dist*JOY_MAX; dy = dy/dist*JOY_MAX; }
       joyKnob.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
-      joySetKeys(dx, dy); e.preventDefault(); break;
+      _joyDx = dx / JOY_MAX;
+      _joyDy = dy / JOY_MAX;
+      e.preventDefault(); break;
     }
   }, {passive: false});
 
