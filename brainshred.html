@@ -555,13 +555,15 @@ function diffMultiplier(song){
   return Math.round((laneF * densityF * bpmF * chordF) * 1000) / 1000;
 }
 
-// Weighted score: raw score × accuracy bonus × difficulty multiplier
-// accuracy bonus: 0.5 at 0%, 1.0 at 100% — so partial accuracy still counts
-// but high accuracy on hard content is rewarded more than sloppy expert play
-function calcWeightedScore(rawScore, accuracyPct, song){
-  const accBonus  = 0.5 + (accuracyPct / 100) * 0.5; // 0.5 – 1.0
-  const diffMult  = diffMultiplier(song);
-  return Math.round(rawScore * accBonus * diffMult);
+// Weighted score: accuracy-normalized so high accuracy on harder songs always ranks above lower accuracy on easier ones.
+// accFactor uses exponent 1.5 to reward high accuracy exponentially (99% >> 80%).
+// comboFactor adds up to 25% bonus for sustained combos.
+// diffMult scales the ceiling by song difficulty.
+function calcWeightedScore(accuracyPct, song, maxCombo, totalNotes){
+  const diffMult   = diffMultiplier(song);
+  const accFactor  = Math.pow(accuracyPct / 100, 1.5);
+  const comboFactor= 1 + (totalNotes > 0 ? (maxCombo / totalNotes) * 0.25 : 0);
+  return Math.round(accFactor * comboFactor * diffMult * 100000);
 }
 
 
@@ -904,7 +906,7 @@ async function showResults(){
   const gs=gameState,total=gs.perfects+gs.goods+gs.misses,acc=total>0?Math.round(((gs.perfects+gs.goods)/total)*100):0;
   let grade='D';if(acc>=95)grade='S';else if(acc>=85)grade='A';else if(acc>=70)grade='B';else if(acc>=55)grade='C';
   const gc=GRADE_COLOR[grade],av=AVATARS.find(a=>a.id===player.avatar),off=OFFICES.find(o=>o.id===player.office),gt=GUITARS.find(g=>g.id===player.guitar);
-  const weightedScore = calcWeightedScore(gs.score, acc, selectedSong);
+  const weightedScore = calcWeightedScore(acc, selectedSong, gs.maxCombo, total);
   const diffMult = diffMultiplier(selectedSong);
   document.getElementById('results-content').innerHTML=`
     <div style="text-align:center;margin-bottom:20px;position:relative;padding:18px 0;">
@@ -2074,19 +2076,15 @@ function showBoundaryMsg(){
   const el=document.getElementById('boundary-msg');if(el)el.style.display='flex';
   clearTimeout(_boundaryT);_boundaryT=setTimeout(()=>{if(el)el.style.display='none';_boundaryShown=false;},4500);
 }
-// Returns the floor Y for a world-space position, accounting for main stage platform and ramp
+// Returns the floor Y for a world-space position, accounting for main stage platform and ramp.
+// Main stage group is at world (0, 0, -60), so local z = wz + 60.
+// Platform: local x -32..32, z -15..15, top at y=3.
+// Ramp: same x range, local z 15..20 (world z -45..-40), linear rise 0→3.
 function getFloorY(wx, wz) {
-  // Main stage group sits at world (0, 0, -60); convert to group-local coords
   const lz = wz + 60;
   const lx = wx;
-  // Platform top at y=3: local x -32..32, z -15..15
-  if (Math.abs(lx) <= 31 && lz >= -15 && lz <= 15.5) return 3.0;
-  // Ramp approach: center stairs (lx -8..8), left stairs (lx -24.5..-19.5), right (lx 19.5..24.5)
-  const onStair = Math.abs(lx) <= 8 || (lx >= -24.5 && lx <= -19.5) || (lx >= 19.5 && lx <= 24.5);
-  if (onStair && lz >= 11.4 && lz <= 15.6) {
-    const t = (15.6 - lz) / (15.6 - 11.4); // 0 at top of ramp, 1 at platform level
-    return Math.max(0, t * 3.0);
-  }
+  if (Math.abs(lx) <= 32 && lz >= -15 && lz <= 15) return 3.0;
+  if (Math.abs(lx) <= 32 && lz > 15 && lz <= 20) return (20 - lz) / 5 * 3.0;
   return 0;
 }
 
@@ -2110,8 +2108,19 @@ function updatePlayer(dt) {
       playerGroup.position.x=Math.max(-BOUNDS+2,Math.min(BOUNDS-2,playerGroup.position.x-vel.x*2));
       playerGroup.position.z=Math.max(-BOUNDS-3,Math.min(BOUNDS-2,playerGroup.position.z-vel.z*2));
     } else {
-      playerGroup.position.x=nx;
-      playerGroup.position.z=nz;
+      const curY=playerGroup.position.y;
+      const stepLimit=1.2;
+      const fullOk=getFloorY(nx,nz)<=curY+stepLimit;
+      const xOk=getFloorY(nx,playerGroup.position.z)<=curY+stepLimit;
+      const zOk=getFloorY(playerGroup.position.x,nz)<=curY+stepLimit;
+      if(fullOk){
+        playerGroup.position.x=nx;
+        playerGroup.position.z=nz;
+      } else if(xOk){
+        playerGroup.position.x=nx;
+      } else if(zOk){
+        playerGroup.position.z=nz;
+      }
     }
     playerGroup.rotation.y=Math.atan2(vel.x,vel.z);
     moveDir.set(-Math.sin(playerGroup.rotation.y),0,-Math.cos(playerGroup.rotation.y));
