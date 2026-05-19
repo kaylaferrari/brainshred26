@@ -1648,21 +1648,26 @@ function buildMainStage(zone) {
   lip.material.emissive = new THREE.Color(0xC8F500).multiplyScalar(0.6);
   lip.position.set(0, 3.2, 15); g.add(lip);
 
-  // Stage stairs — 3 steps at front edge center
-  [[0.9, 14.5],[1.8, 13.5],[2.7, 12.5]].forEach(([stepY, stepZ]) => {
-    const step = mkBox(16, 0.9, 1.8, 0x1A1A26);
-    step.position.set(0, stepY, stepZ); g.add(step);
+  // Walkable ramp surface — rises from y=0 (lz=20) to y=3 (lz=15)
+  const rampAngle = Math.atan2(3, 5);            // ≈0.54 rad
+  const rampLen   = Math.sqrt(5*5 + 3*3);        // ≈5.83 — hypotenuse length
+  const rampSurf  = mkBox(64, 0.3, rampLen, 0x121220);
+  rampSurf.material.emissive = new THREE.Color(0x2020AA).multiplyScalar(0.25);
+  rampSurf.position.set(0, 1.5, 17.5);
+  rampSurf.rotation.x = rampAngle;
+  g.add(rampSurf);
+  // Glowing side rails on the ramp so players can see it from a distance
+  [-32, 32].forEach(rx => {
+    const rail = mkBox(0.3, 0.3, rampLen, 0xC8F500);
+    rail.material.emissive = new THREE.Color(0xC8F500).multiplyScalar(0.5);
+    rail.position.set(rx, 1.5, 17.5);
+    rail.rotation.x = rampAngle;
+    g.add(rail);
   });
-  // Left stair set
-  [[0.9, 14.5],[1.8, 13.5],[2.7, 12.5]].forEach(([stepY, stepZ]) => {
-    const step = mkBox(5, 0.9, 1.8, 0x1A1A26);
-    step.position.set(-22, stepY, stepZ); g.add(step);
-  });
-  // Right stair set
-  [[0.9, 14.5],[1.8, 13.5],[2.7, 12.5]].forEach(([stepY, stepZ]) => {
-    const step = mkBox(5, 0.9, 1.8, 0x1A1A26);
-    step.position.set(22, stepY, stepZ); g.add(step);
-  });
+  // Glowing floor stripe at ramp base (world z -40) to signal the entry point
+  const rampBase = mkBox(64, 0.2, 0.4, 0xC8F500);
+  rampBase.material.emissive = new THREE.Color(0xC8F500).multiplyScalar(0.6);
+  rampBase.position.set(0, 0.1, 20); g.add(rampBase);
 
   // Catwalk / runway
   const cat = mkBox(6, 0.2, 22, 0x111120); cat.position.set(0, 3.1, 23); g.add(cat);
@@ -2258,14 +2263,12 @@ function showBoundaryMsg(){
 // Platform: local x -32..32, z -15..15, top at y=3.
 // Ramp: same x range, local z 15..20 (world z -45..-40), linear rise 0→3.
 function getFloorY(wx, wz) {
-  // Stage group at world (0,0,-60). Platform top y=3.0.
-  // Platform spans local z -15..15 (world z -75..-45) — covers the FULL footprint including
-  // the stair zone so the avatar can never clip through the front face.
-  // Ramp sits entirely outside the platform (local z 15..20 = world z -45..-40).
   const lz = wz + 60;
   const lx = wx;
+  // Platform top surface (world z -75..-45)
   if (Math.abs(lx) <= 32 && lz >= -15 && lz <= 15) return 3.0;
-  if (Math.abs(lx) <= 32 && lz > 15 && lz <= 20) return Math.max(0, (20 - lz) / 5 * 3.0);
+  // Ramp approach — wider x so players from side spawn points can access it
+  if (Math.abs(lx) <= 36 && lz > 15 && lz <= 20) return Math.max(0, (20 - lz) / 5 * 3.0);
   return 0;
 }
 
@@ -2290,10 +2293,14 @@ function updatePlayer(dt) {
       playerGroup.position.x=Math.max(-BOUNDS+2,Math.min(BOUNDS-2,playerGroup.position.x-vel.x*2));
       playerGroup.position.z=Math.max(-BOUNDS-3,Math.min(BOUNDS-2,playerGroup.position.z-vel.z*2));
     } else {
-      // No step-height blocking — getFloorY y-snap at end of frame handles all height transitions.
-      // Blocking caused diagonal approaches to be permanently stuck at the ramp boundary.
-      playerGroup.position.x=nx;
-      playerGroup.position.z=nz;
+      const newY = getFloorY(nx, nz);
+      const curY = playerGroup.position.y;
+      if (newY - curY > 2.4) {
+        // Stage side wall — player must use the ramp, not walk through the stage face
+      } else {
+        playerGroup.position.x=nx;
+        playerGroup.position.z=nz;
+      }
     }
     playerGroup.rotation.y=Math.atan2(vel.x,vel.z);
     moveDir.set(-Math.sin(playerGroup.rotation.y),0,-Math.cos(playerGroup.rotation.y));
@@ -2309,6 +2316,7 @@ function updateCamera(dt) {
   const decay=1-Math.exp(-CAM_K*dt);
   camBase.x+=(playerGroup.position.x-camBase.x)*decay;
   camBase.z+=(playerGroup.position.z-camBase.z)*decay;
+  camBase.y+=(playerGroup.position.y-camBase.y)*decay; // track player elevation
   const LA_STRENGTH=5.0;
   lookAhead.x+=(moveDir.x*LA_STRENGTH-lookAhead.x)*decay*0.6;
   lookAhead.z+=(moveDir.z*LA_STRENGTH-lookAhead.z)*decay*0.6;
