@@ -1648,26 +1648,31 @@ function buildMainStage(zone) {
   lip.material.emissive = new THREE.Color(0xC8F500).multiplyScalar(0.6);
   lip.position.set(0, 3.2, 15); g.add(lip);
 
-  // Walkable ramp surface — rises from y=0 (lz=20) to y=3 (lz=15)
-  const rampAngle = Math.atan2(3, 5);            // ≈0.54 rad
-  const rampLen   = Math.sqrt(5*5 + 3*3);        // ≈5.83 — hypotenuse length
-  const rampSurf  = mkBox(64, 0.3, rampLen, 0x121220);
-  rampSurf.material.emissive = new THREE.Color(0x2020AA).multiplyScalar(0.25);
-  rampSurf.position.set(0, 1.5, 17.5);
+  // Walkable ramp surface — 10 units deep, rises from y=0 (lz=25) to y=3 (lz=15)
+  // Width 80 matches the ±40 physics ramp zone in getFloorY
+  const rampAngle = Math.atan2(3, 10);             // ≈0.29 rad — gentler slope
+  const rampLen   = Math.sqrt(10*10 + 3*3);        // ≈10.44 — hypotenuse length
+  const rampSurf  = mkBox(80, 0.3, rampLen, 0x121228);
+  rampSurf.material.emissive = new THREE.Color(0x2020AA).multiplyScalar(0.2);
+  rampSurf.position.set(0, 1.5, 20);               // center at lz=20, y=1.5
   rampSurf.rotation.x = rampAngle;
   g.add(rampSurf);
-  // Glowing side rails on the ramp so players can see it from a distance
+  // Glowing side rails — at ±32 (platform edge width) so they frame the stage visually
   [-32, 32].forEach(rx => {
     const rail = mkBox(0.3, 0.3, rampLen, 0xC8F500);
-    rail.material.emissive = new THREE.Color(0xC8F500).multiplyScalar(0.5);
-    rail.position.set(rx, 1.5, 17.5);
+    rail.material.emissive = new THREE.Color(0xC8F500).multiplyScalar(0.55);
+    rail.position.set(rx, 1.5, 20);
     rail.rotation.x = rampAngle;
     g.add(rail);
   });
-  // Glowing floor stripe at ramp base (world z -40) to signal the entry point
-  const rampBase = mkBox(64, 0.2, 0.4, 0xC8F500);
+  // Glowing floor stripe at ramp base (lz=25, world z=-35)
+  const rampBase = mkBox(80, 0.2, 0.4, 0xC8F500);
   rampBase.material.emissive = new THREE.Color(0xC8F500).multiplyScalar(0.6);
-  rampBase.position.set(0, 0.1, 20); g.add(rampBase);
+  rampBase.position.set(0, 0.1, 25); g.add(rampBase);
+  // Mid-ramp glow stripe (lz=20)
+  const rampMid = mkBox(80, 0.2, 0.4, 0x88AA00);
+  rampMid.material.emissive = new THREE.Color(0x88AA00).multiplyScalar(0.5);
+  rampMid.position.set(0, 1.5, 20); g.add(rampMid);
 
   // Catwalk / runway
   const cat = mkBox(6, 0.2, 22, 0x111120); cat.position.set(0, 3.1, 23); g.add(cat);
@@ -2258,17 +2263,13 @@ function showBoundaryMsg(){
   const el=document.getElementById('boundary-msg');if(el)el.style.display='flex';
   clearTimeout(_boundaryT);_boundaryT=setTimeout(()=>{if(el)el.style.display='none';_boundaryShown=false;},4500);
 }
-// Returns the floor Y for a world-space position, accounting for main stage platform and ramp.
-// Main stage group is at world (0, 0, -60), so local z = wz + 60.
-// Platform: local x -32..32, z -15..15, top at y=3.
-// Ramp: same x range, local z 15..20 (world z -45..-40), linear rise 0→3.
 function getFloorY(wx, wz) {
   const lz = wz + 60;
   const lx = wx;
-  // Platform top surface (world z -75..-45)
+  // Platform top (world z -75..-45)
   if (Math.abs(lx) <= 32 && lz >= -15 && lz <= 15) return 3.0;
-  // Ramp approach — wider x so players from side spawn points can access it
-  if (Math.abs(lx) <= 36 && lz > 15 && lz <= 20) return Math.max(0, (20 - lz) / 5 * 3.0);
+  // Ramp: 10 units deep, ±40 wide — covers all spawn points including x=±40
+  if (Math.abs(lx) <= 40 && lz > 15 && lz <= 25) return Math.max(0, (25 - lz) / 10 * 3.0);
   return 0;
 }
 
