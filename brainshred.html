@@ -652,34 +652,21 @@ const SONGS=SONGS_CONFIG.map(s=>({...s,duration:35000,notes:makeChart(s.bpm,35,s
 // ── DIFFICULTY MULTIPLIER ──────────────────────────────────────────────────
 // Accounts for: lanes to cover, note density, BPM, chord rate
 // Expert 100% >> Easy 100% in the rankings, but a great Easy score
-// can still beat a poor Expert score — it's about skill relative to challenge.
-function diffMultiplier(song){
-  const EASY_BASELINE_NPS = 112 * 0.50 / 60; // notes/sec on Easy at 112bpm
-  const p = {
-    easy:   {lanes:3, density:.50, chordRate:.00},
-    medium: {lanes:4, density:.75, chordRate:.05},
-    hard:   {lanes:5, density:1.0, chordRate:.15},
-    expert: {lanes:5, density:1.5, chordRate:.25},
-  }[song.diff.toLowerCase()] || {lanes:4,density:.75,chordRate:.05};
-
-  const nps      = song.bpm * p.density / 60;
-  const laneF    = p.lanes === 3 ? 1.0 : p.lanes === 4 ? 1.35 : 1.75;
-  const densityF = nps / EASY_BASELINE_NPS;
-  const bpmF     = song.bpm / 110;
-  const chordF   = 1 + p.chordRate * 2;
-
-  return Math.round((laneF * densityF * bpmF * chordF) * 1000) / 1000;
+// Difficulty multipliers — fixed per tier, calibrated so Expert perfect = 500,000.
+// Easy perfect = 187,500 | Medium = 281,250 | Hard = 406,250 | Expert = 500,000
+function diffMultiplier(song) {
+  return { easy: 1.5, medium: 2.25, hard: 3.25, expert: 4.0 }[song.diff.toLowerCase()] || 2.25;
 }
 
-// Weighted score: accuracy-normalized so high accuracy on harder songs always ranks above lower accuracy on easier ones.
-// accFactor uses exponent 1.5 to reward high accuracy exponentially (99% >> 80%).
-// comboFactor adds up to 25% bonus for sustained combos.
-// diffMult scales the ceiling by song difficulty.
+// Weighted score: accFactor rewards high accuracy exponentially (99% >> 80%).
+// comboFactor adds up to 25% bonus for a full combo. diffMult scales by tier.
+// Formula: (accuracy/100)^1.5 × (1 + combo_ratio×0.25) × diffMult × 100,000
+// Max achievable: 1 × 1.25 × 4.0 × 100,000 = 500,000 on Expert.
 function calcWeightedScore(accuracyPct, song, maxCombo, totalNotes){
-  const diffMult   = diffMultiplier(song);
-  const accFactor  = Math.pow(accuracyPct / 100, 1.5);
-  const comboFactor= 1 + (totalNotes > 0 ? (maxCombo / totalNotes) * 0.25 : 0);
-  return Math.round(accFactor * comboFactor * diffMult * 100000);
+  const dm          = diffMultiplier(song);
+  const accFactor   = Math.pow(accuracyPct / 100, 1.5);
+  const comboFactor = 1 + (totalNotes > 0 ? (maxCombo / totalNotes) * 0.25 : 0);
+  return Math.round(accFactor * comboFactor * dm * 100000);
 }
 
 
